@@ -1,13 +1,12 @@
 from bs4 import BeautifulSoup
-from mutagen.mp3 import MP3
-from mutagen.id3 import ID3, APIC
-from mutagen.easyid3 import EasyID3
+import eyed3
 from urllib.parse import quote
 from urllib.request import urlopen, Request
 from google_images_search import GoogleImagesSearch
 import os
 import requests
 import shutil
+import coverpy
 import urllib.request
 import youtube_dl
 import itunespy
@@ -18,31 +17,49 @@ def audioSearch(audio_string):
     for root, dirs, files in os.walk('C:\\'):
         if audio_string in files:
             aString = str.join(root, audio_string)
-            print("found: %s" % aString)
+            print("found: " + aString)
             return aString
     return "find"
 
 
 # Search for all audio files to be added
 
-def imgSearch(album):
+
+def imgSearch(album, title):
+    c = coverpy.CoverPy()
+    while True:
+        print (album)
+        album = album.split(" - ")
+        print (title)
+        i = title + album
+        if i == 'exit':
+            exit()
+
+        try:
+            query = c.get_cover(i)
+            print("Name: %s" % query.name)
+            print("EntityType: %s" % query.type)
+            print("Artist: %s" % query.artist)
+            print("Album: %s" % query.album)
+            print(query.artwork())
+            print("QueryUrl: %s" % query.url)
+        except coverpy.exceptions.NoResultsException as e:
+            print("Nothing found.")
     return
-def textTags(audio, artist, album, title, arturl):
-    # Change non-image tags
-    #response = requests.get(arturl, stream=True)
-    #ith open('img.jpg', 'wb') as out_file:
-    #    shutil.copyfileobj(response.raw, out_file)
-    #del response
+
+def textTags(audio, artist, album, title):
     print(audio)
-    track = EasyID3(title, filename=audio)
-    track['artist'] = artist
-    track['title'] = title
-    track['tracknumber'] = '0'
-    track['album'] = album
+    track = eyed3.load(os.path.dirname(os.path.abspath(__file__)) + r"\\" + audio).tag
+
+    track.artist = artist
+    track.album_artist = artist
+    track.title = title
+    track.album = album
     track.save()
 
-    track = EasyID3(title, filename=audio)
-    audio.add_tags()
+    os.rename(os.path.dirname(os.path.abspath(__file__)) + r"\\" + audio, os.path.dirname(os.path.abspath(__file__)) + r"\\" + artist + " - " + title + '.mp3')
+
+    arturl = imgSearch(album, title)
     """
     track.tags.add(
         APIC(
@@ -50,7 +67,7 @@ def textTags(audio, artist, album, title, arturl):
             mime='image/jpeg',
             type=3,
             desc=u'Cover',
-            data=(urlopen(arturl)).read()
+            data=(urlopen(url)).read()
         )
     )
     track.save()
@@ -86,20 +103,26 @@ def vidDL(url):
     }
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
+        info = ydl.extract_info(url, download=True)
+        filename = ydl.prepare_filename(info)
+        filename = filename.strip('.m4a')
+        filename = filename + '.mp3'
+        print(filename)
+        filename = filename.strip('.webm')
+        return filename
 
 
 def findAlbum(title, artist):
-    artistSearch = itunespy.search_artist(artist)
     tracks = itunespy.search_track(title)
     i = 1
     for x in tracks:
-        i = i+1
-        return x.collection_name
+        if x.artist_name == artist:
+            return x.collection_name
 
 
 def main():
-    print("Input file name with file type/ALL/EXIT: \n")
     audio_name = input("Input file name with file type/ALL/EXIT (DO NOT add .mp3 at the end of the file): \n")
+    filename = ''
     if audio_name != "ALL":
         aString = audioSearch(audio_name + ".mp3")
         if " - " in audio_name:
@@ -130,14 +153,12 @@ def main():
         if aString == "find":
             print("Could not find file, checking videos for closest match")
             vidURL = yturl(audio_title, artist_name)
-            vidDL(vidURL)
-
+            filename = vidDL(vidURL)
         album_title = findAlbum(audio_title, artist_name)
-
-        # Find Album
+        arturl = ''
         # Find Album Art
         aString = audioSearch(audio_name + ".mp3")
-        textTags(aString, artist_name, album_title, audio_title, imgSearch(album_title))
+        textTags(filename, artist_name, album_title, audio_title)
     elif audio_name == "ALL":
         print("To Be Added")
     elif audio_name == "EXIT":
