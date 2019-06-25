@@ -1,11 +1,8 @@
 from bs4 import BeautifulSoup
 import eyed3
 from urllib.parse import quote
-from urllib.request import urlopen, Request
-from google_images_search import GoogleImagesSearch
+from urllib.request import urlopen
 import os
-import requests
-import shutil
 import coverpy
 import urllib.request
 import youtube_dl
@@ -25,27 +22,19 @@ def audioSearch(audio_string):
 # Search for all audio files to be added
 
 
-def imgSearch(album, title):
+def imgSearch(artist, title):
     c = coverpy.CoverPy()
-    while True:
-        print (album)
-        album = album.split(" - ")
-        print (title)
-        i = title + album
-        if i == 'exit':
-            exit()
-
-        try:
-            query = c.get_cover(i)
-            print("Name: %s" % query.name)
-            print("EntityType: %s" % query.type)
-            print("Artist: %s" % query.artist)
-            print("Album: %s" % query.album)
-            print(query.artwork())
-            print("QueryUrl: %s" % query.url)
-        except coverpy.exceptions.NoResultsException as e:
-            print("Nothing found.")
-    return
+    print(artist)
+    print(title)
+    i = str(title) + " " + str(artist)
+    query = c.get_cover(i)
+    print("Name: %s" % query.name)
+    print("EntityType: %s" % query.type)
+    print("Artist: %s" % query.artist)
+    print("Album: %s" % query.album)
+    print(query.artwork())
+    print("QueryUrl: %s" % query.url)
+    return query.artwork()
 
 def textTags(audio, artist, album, title):
     print(audio)
@@ -56,10 +45,12 @@ def textTags(audio, artist, album, title):
     track.title = title
     track.album = album
     track.save()
-
+    arturl = imgSearch(artist, title)
+    imagedata = urllib.request.urlopen(arturl).read()
+    track.images.set(3, imagedata, "image/jpeg", u"Desc")
+    track.save()
     os.rename(os.path.dirname(os.path.abspath(__file__)) + r"\\" + audio, os.path.dirname(os.path.abspath(__file__)) + r"\\" + artist + " - " + title + '.mp3')
 
-    arturl = imgSearch(album, title)
     """
     track.tags.add(
         APIC(
@@ -77,7 +68,6 @@ def yturl(title, artist):
     print(query)
     url = "https://www.youtube.com/results?search_query=" + query
     response = urllib.request.urlopen(url)
-    #html = response.read()
     soup = BeautifulSoup(response)
     chosenVid = 'https://www.youtube.com'
     print("Choose the video number you prefer \n")
@@ -106,9 +96,10 @@ def vidDL(url):
         info = ydl.extract_info(url, download=True)
         filename = ydl.prepare_filename(info)
         filename = filename.strip('.m4a')
+        filename = filename.strip('.webm')
+        filename = filename.strip('.web')
         filename = filename + '.mp3'
         print(filename)
-        filename = filename.strip('.webm')
         return filename
 
 
@@ -155,7 +146,6 @@ def main():
             vidURL = yturl(audio_title, artist_name)
             filename = vidDL(vidURL)
         album_title = findAlbum(audio_title, artist_name)
-        arturl = ''
         # Find Album Art
         aString = audioSearch(audio_name + ".mp3")
         textTags(filename, artist_name, album_title, audio_title)
